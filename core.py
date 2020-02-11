@@ -7,11 +7,25 @@ import re
 import h5py
 
 
+def load(path, num_steps=1, num_files=-1, verbose=True, rebuild_cache=True):
+    """
+    DESCRIPTION:  load the record data from .txt files
+    INPUT:  path:  the directory of the measurement record
+            num_steps:
+            num-files:  the number of record files to read. num=-1 stands for reading all files in the directory.
+                        rebuild_cache:
+    OUTPUT:  returns a analyzer.Record object of type 'sequence'
+    NOTES:  a binary cache (.npy) mechanism is implemented in this functioon
+    """
 
-
-def load(path, pulse_num, num=-1, verbose=True, rebuild=False, format="npy", compressed=False):
+    cache_folder_name = 'cache'
 
     def listdir(path):
+        """
+            DESCRIPTION:  list the valid .txt record files in a given directory
+            INPUT:  path string to the directory
+            OUTPUT:  a sorted list of path strings
+        """
         files = [f for f in os_loaddir(path) if isfile(join(path, f))]
         index_p = re.compile(r"(?:.*?)(\d+)(?:\.txt)")
         index = []
@@ -27,63 +41,61 @@ def load(path, pulse_num, num=-1, verbose=True, rebuild=False, format="npy", com
         return files
 
     files = listdir(path)
-    if num == -1:
-        num = len(files)
+    if num_files == -1:
+        num_files = len(files)
     data_list = []
-    pulse_len = 0
-    seq_num = 0
-    if not exists(join(path, "python")):
-        mkdir(join(path, "python"))
-    appen = {"h5f": ".h5f", "npz": ".npz", "npy": ".npy"}
-    for i in range(num):
+    if not exists(join(path, cache_folder_name)):
+        mkdir(join(path, cache_folder_name))
+    for i in range(num_files):
         if verbose:
             print("Loading file #" + str(i) + " ...")
-        file_name = join(path, "python", basename(files[i])[:-4] + appen[format])
-        # if False:
-        if not rebuild and exists(file_name):
-            # pulses = np.fromfile(file_name)
-            # pulses = np.load(file_name)
-            pulses = [None] * pulse_num
-            if format == "h5f":
-                h5f = h5py.File(file_name, 'r')
-                for idx in list(h5f.keys()):
-                    pulses[int(idx)] = h5f[idx][:]
-                h5f.close()
-            elif format == "npz":
-                npzfile = np.load(file_name)
-                for idx in npzfile.files:
-                    pulses[int(idx)] = npzfile[idx]
-            else:
-                pulses = np.load(file_name, allow_pickle=True)
+        file_name = join(path, cache_folder_name, basename(files[i])[:-4] + '.npy')
+        if not rebuild_cache and exists(file_name):
+            seq_rec_i = np.load(file_name, allow_pickle=True)
         else:
-            record = np.loadtxt(files[i], dtype=np.float32)
-            if not pulse_len:
-                pulse_len = record.shape[0]
-                seq_num = int(record.shape[1] / pulse_num)
-            record = np.transpose(record)
-            pulses = [record[j::pulse_num, :] for j in range(pulse_num)]
-            if format == "h5f":
-                h5f = h5py.File(file_name, 'w', libver='latest')
-                for idx, pulse in enumerate(pulses):
-                    if compressed:
-                        h5f.create_dataset(str(idx), data=pulse, compression='gzip', compression_opts=9)
-                    else:
-                        h5f.create_dataset(str(idx), data=pulse)
-                h5f.close()
-            elif format == "npz":
-                if compressed:
-                    np.savez_compressed(file_name, **{str(idx): pulse for idx, pulse in enumerate(pulses)})
-                else:
-                    np.savez(file_name, **{str(idx): pulse for idx, pulse in enumerate(pulses)})
-            else:
-                np.save(file_name, pulses)
-        data_list.append(pulses)
+            record_raw = np.loadtxt(files[i], dtype=np.float32)
+            pulse_len = len(record_raw)
+            record = np.transpose(record_raw)
+            seq_rec_i = [record[j::num_steps, :] for j in range(num_steps)]
+            np.save(file_name, seq_rec_i)
+        data_list.append(seq_rec_i)
     data = [np.vstack(pulse_list) for pulse_list in zip(*data_list)]
-    return data
+    seq_rec = Record('sequence', data=data)
+    return seq_rec
 
 
-class Record(np.ndarray):
+def cache_clean():
+    print(123)
 
-    def __init__(self, shape):
-        super().__init__(shape)
-        print('123')
+
+class Record():
+    """
+    DESCRIPTION:  list the valid .txt record files in a given directory
+    INPUT:  path string to the directory
+    OUTPUT:  a sorted list of path strings
+    """
+    def __init__(self, type, data=None, num_steps=0):
+        self.type = type
+        self.data = data
+        if type == 'pulse':
+
+        if type == 'sequence':
+            if data:
+                self.num_steps = len(data)
+                self.len = np.asarray([pulse_rec_data.shape[-1] for pulse_rec_data in data])
+
+    def avg_pulse(self, nmin=None, nmax=None, length=0):
+        avg = []
+        for pulse_rec_data in self.data:
+            avg.append(np.mean(pulse_rec_data, axis=0))
+        return Record('sequence', data=avg)
+
+    def show(self):
+        len_max = np.max(self.len)
+        avg_padded = np.zeros((self.num_steps, len_max))
+        avg = self.avg_pulse()
+        for pulse_avg, pulse_len in zip(avg.data, self.len):
+            avg_padded[:pulse_len] = pulse_avg
+        plt.imshow(avg_padded)
+        plt.show()
+
