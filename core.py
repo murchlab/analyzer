@@ -155,3 +155,26 @@ class Record():
     #     plt.imshow(avg_padded)
     #     plt.show()
 
+
+### Pauli algebra ###
+
+sigma_x = [[0, 1], [1, 0]]
+sigma_y = [[0, -1j], [1j, 0]]
+sigma_z = [[1, 0], [0, -1]]
+
+sigma_x = np.asarray(sigma_x)
+sigma_y = np.asarray(sigma_y)
+sigma_z = np.asarray(sigma_z)
+
+sigma = [sigma_x, sigma_y, sigma_z]
+sigma4 = [np.eye(2), sigma_x, sigma_y, sigma_z]
+
+
+def pauli_decomp(rho):
+    vector4 = [np.trace(rho @ E) / 2 for E in sigma4]
+    return np.asarray(vector4)
+
+
+def bloch_vector(rho):
+    vector = [np.trace(rho @ E) for E in sigma4]
+    return np.asarray(vector)
