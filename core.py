@@ -131,7 +131,7 @@ class Record():
             ax2 = ax1.twiny()
             ax1.imshow(stacked_data)
             ax1.set_xlabel('Time (ns)')
-            ax1.set_ylabel('Pattern')
+            ax1.set_ylabel('Step')
             ax2.set_xlabel('Time index')
             ax1.axis('auto')
             ax1.set_xticklabels(ax1.get_xticks() * self.delta_t * 1E9)
