@@ -81,7 +81,7 @@ def average_step(seq_data, nmin=None, nmax=None, length=0):
 
 def show(seq_data, mode='sample', delta_t = 20E-9):
 
-    mpl.rcParams['figure.dpi'] = 150
+    mpl.rcParams['figure.dpi'] = 300
     def show_full():
         stacked_data = np.vstack(tuple(pattern for pattern in seq_data))
         plt.imshow(stacked_data)

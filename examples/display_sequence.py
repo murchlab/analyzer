@@ -5,5 +5,5 @@ num_steps = 101
 
 seq_rec = az.load(path, num_steps=num_steps, num_files=5)
 
-seq_rec.delta_t = 20E-9
-seq_rec.show(mode='sample')
+delta_t = 20E-9
+az.show(seq_rec, mode='sample', delta_t=delta_t)
