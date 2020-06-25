@@ -6,9 +6,9 @@ from os import mkdir, stat
 from shutil import rmtree
 import re
 
-#########################
-# Basic data processing #
-#########################
+#####################
+# Basic mathematics #
+#####################
 
 # Pauli algebra
 
@@ -48,8 +48,29 @@ def bloch_vector(rho):
 ###################
 
 
-def broadcast(f, inputs):
-    return
+def broadcast(f, seq_inputs):
+    """
+        DESCRIPTION:  For broadcasting a function over a sequence object
+        INPUT:  f:  A function object
+                seq_inputs:  A tuple of sequence data inputs
+        OUTPUT:  A list of outputs
+    """
+    return [f(*inputs) for inputs in zip(seq_inputs)]
+
+
+def avg_time(self, nmin=[], nmax=[], length=0, stack=False):
+    avg = []
+    i = 0
+    for pulse in self.data:
+        if length:
+            nmax_i = nmin[i] + length - 1
+        else:
+            nmax_i = nmax[i]
+        avg.append(np.mean(pulse[:, nmin[i]:nmax_i], axis=1))
+        i += 1
+    if stack:
+        avg = np.hstack(avg)
+    return avg
 
 
 class Record():
@@ -143,9 +164,9 @@ class Record():
     #     plt.show()
 
 
-###########################
-# File IO functionalities #
-###########################
+#####################
+# File IO functions #
+#####################
 
 def load(path, num_steps=1, num_files=-1, verbose=True, rebuild_cache=False):
     """
