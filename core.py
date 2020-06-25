@@ -9,6 +9,9 @@ import re
 cache_folder_name = 'cache'
 
 
+### File IO functionalities ###
+
+
 def load(path, num_steps=1, num_files=-1, verbose=True, rebuild_cache=False):
     """
     DESCRIPTION:  load the record data from .txt files
@@ -83,7 +86,7 @@ def load(path, num_steps=1, num_files=-1, verbose=True, rebuild_cache=False):
 
 class Record():
     """
-    DESCRIPTION:  The class for record data
+    DESCRIPTION:  The class for record data.
     FUNCTIONS:
     """
     def __init__(self, dtype, data=None, delta_t=None):
