@@ -48,6 +48,10 @@ def bloch_vector(rho):
 ###################
 
 
+def broadcast(f, inputs):
+    return
+
+
 class Record():
     """
     DESCRIPTION:  The class for record data.
@@ -90,7 +94,7 @@ class Record():
         return avg
 
     def average_step(self, nmin=None, nmax=None, length=0):
-        avg = np.vstack(tuple(np.mean(pattern, axis=0) for pattern in self.data))
+        avg = np.vstack(tuple(np.mean(step_data, axis=0) for step_data in self.data))
         return avg
 
     def show(self, mode='sample'):
