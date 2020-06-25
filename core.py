@@ -14,13 +14,13 @@ cache_folder_name = 'cache'
 
 def load(path, num_steps=1, num_files=-1, verbose=True, rebuild_cache=False):
     """
-    DESCRIPTION:  load the record data from .txt files
+    DESCRIPTION:  Load the record data from .txt files
     INPUT:  path:  the directory of the measurement record
             num_steps:
             num_files:  the number of record files to read. num=-1 stands for reading all files in the directory.
                         rebuild_cache:
-    OUTPUT:  returns a analyzer.Record object of type 'sequence'
-    NOTES:  a binary cache (.npy) mechanism is implemented in this functioon
+    OUTPUT:  Returns a analyzer.Record object of type 'sequence'
+    NOTES:  A binary cache (.npy) mechanism is implemented in this functioon
     """
 
     def clean_cache():
@@ -31,9 +31,9 @@ def load(path, num_steps=1, num_files=-1, verbose=True, rebuild_cache=False):
 
     def listdir(path, appendix='txt'):
         """
-            DESCRIPTION:  list the valid .txt record files in a given directory
-            INPUT:  path string to the directory
-            OUTPUT:  a sorted list of path strings
+            DESCRIPTION:  List the valid .txt record files in a given directory
+            INPUT:  Path string to the directory
+            OUTPUT:  A sorted list of path strings
         """
         files = [f for f in os_loaddir(path) if isfile(join(path, f))]
         index_p = re.compile(r"(?:.*?)(\d+)(?:\.{})".format(appendix))
@@ -51,9 +51,9 @@ def load(path, num_steps=1, num_files=-1, verbose=True, rebuild_cache=False):
 
     def loadfile(file_name):
         """
-            DESCRIPTION:  load the data from a single file
-            INPUT:  path string to the file
-            OUTPUT:  a list of numpy arrays (one for each pattern)
+            DESCRIPTION:  Load the data from a single file
+            INPUT:  Path string to the file
+            OUTPUT:  A list of numpy arrays (one for each pattern)
         """
         if verbose:
             print("Loading file #" + str(i) + " ...")
@@ -84,11 +84,15 @@ def load(path, num_steps=1, num_files=-1, verbose=True, rebuild_cache=False):
     return seq_rec
 
 
+##END load
+
+
 class Record():
     """
     DESCRIPTION:  The class for record data.
     FUNCTIONS:
     """
+
     def __init__(self, dtype, data=None, delta_t=None):
         self.dtype = dtype
         self.data = data
@@ -104,7 +108,7 @@ class Record():
 
         init_funcs = {
             'pattern': pattern_init,
-            'sequence':sequence_init
+            'sequence': sequence_init
         }
         init_funcs[dtype]()
 
@@ -113,7 +117,6 @@ class Record():
         return avg
 
     def show(self, mode='sample'):
-
         def show_full():
             stacked_data = np.vstack(tuple(pattern for pattern in self.data))
             plt.imshow(stacked_data)
@@ -174,10 +177,20 @@ sigma4 = [np.eye(2), sigma_x, sigma_y, sigma_z]
 
 
 def pauli_decomp(rho):
+    """
+        DESCRIPTION:  Calculate the pauli matrix decomposition of the density matrix rho
+        INPUT:  2x2 density matrix rho
+        OUTPUT:  The coefficients
+    """
     vector4 = [np.trace(rho @ E) / 2 for E in sigma4]
     return np.asarray(vector4)
 
 
 def bloch_vector(rho):
-    vector = [np.trace(rho @ E) for E in sigma4]
+    """
+        DESCRIPTION:  Translate the density matrix representation into bloch vector form
+        INPUT:  2x2 density matrix rho
+        OUTPUT:  The bloch vector components
+    """
+    vector = [np.trace(rho @ E) for E in sigma4[1:]]
     return np.asarray(vector)
