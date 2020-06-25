@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn import mixture
-import toolbox.sequence as sq
+# import toolbox.sequence as sq
 
 
 def measurehist(seq, nmin=[], nmax=[], log=False):

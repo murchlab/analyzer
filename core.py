@@ -6,11 +6,142 @@ from os import mkdir, stat
 from shutil import rmtree
 import re
 
-cache_folder_name = 'cache'
+#########################
+# Basic data processing #
+#########################
+
+# Pauli algebra
+
+sigma_x = [[0, 1], [1, 0]]
+sigma_y = [[0, -1j], [1j, 0]]
+sigma_z = [[1, 0], [0, -1]]
+
+sigma_x = np.asarray(sigma_x)
+sigma_y = np.asarray(sigma_y)
+sigma_z = np.asarray(sigma_z)
+
+sigma = [sigma_x, sigma_y, sigma_z]
+sigma4 = [np.eye(2), sigma_x, sigma_y, sigma_z]
 
 
-### File IO functionalities ###
+def pauli_decomp(rho):
+    """
+        DESCRIPTION:  Calculate the pauli matrix decomposition of the density matrix rho
+        INPUT:  2x2 density matrix rho
+        OUTPUT:  The coefficients
+    """
+    vector4 = [np.trace(rho @ E) / 2 for E in sigma4]
+    return np.asarray(vector4)
 
+
+def bloch_vector(rho):
+    """
+        DESCRIPTION:  Translate the density matrix representation into bloch vector form
+        INPUT:  2x2 density matrix rho
+        OUTPUT:  The bloch vector components
+    """
+    vector = [np.trace(rho @ E) for E in sigma4[1:]]
+    return np.asarray(vector)
+
+###################
+# Data structures #
+###################
+
+
+class Record():
+    """
+    DESCRIPTION:  The class for record data.
+    FUNCTIONS:
+    """
+
+    def __init__(self, dtype, data=None, delta_t=None):
+        self.dtype = dtype
+        self.data = data
+        self.delta_t = delta_t
+
+        def pattern_init():
+            pass
+
+        def sequence_init():
+            if data:
+                self.num_steps = len(data)
+                self.shapes = np.asarray([pattern_rec_data.shape for pattern_rec_data in data])
+
+        init_funcs = {
+            'pattern': pattern_init,
+            'sequence': sequence_init
+        }
+        init_funcs[dtype]()
+
+    # Average can be evaluated along two axes
+
+    def avg_time(self, nmin=[], nmax=[], length=0, stack=False):
+        avg = []
+        i = 0
+        for pulse in self.data:
+            if length:
+                nmax_i = nmin[i] + length - 1
+            else:
+                nmax_i = nmax[i]
+            avg.append(np.mean(pulse[:, nmin[i]:nmax_i], axis=1))
+            i += 1
+        if stack:
+            avg = np.hstack(avg)
+        return avg
+
+    def average_step(self, nmin=None, nmax=None, length=0):
+        avg = np.vstack(tuple(np.mean(pattern, axis=0) for pattern in self.data))
+        return avg
+
+    def show(self, mode='sample'):
+        def show_full():
+            stacked_data = np.vstack(tuple(pattern for pattern in self.data))
+            plt.imshow(stacked_data)
+            plt.xlabel('Time index')
+            plt.ylabel('Pattern')
+            plt.show()
+
+        def show_sample():
+            stacked_data = np.vstack(tuple(pattern[1] for pattern in self.data))
+            fig = plt.figure()
+            ax1 = fig.add_subplot(111)
+            ax2 = ax1.twiny()
+            ax1.imshow(stacked_data)
+            ax1.set_xlabel('Time (ns)')
+            ax1.set_ylabel('Steps')
+            ax2.set_xlabel('Time index')
+            ax1.axis('auto')
+            ax1.set_xticklabels(ax1.get_xticks() * self.delta_t * 1E9)
+            ax2.set_xlim(ax1.get_xlim())
+            plt.show()
+
+        def show_average():
+            avg_data = self.average_step()
+            plt.imshow(avg_data)
+            plt.xlabel('Time index')
+            plt.ylabel('Pattern')
+            plt.show()
+
+        show_funcs = {
+            'full': show_full,
+            'sample': show_sample,
+            'average': show_average
+        }
+        show_funcs[mode]()
+
+    # def show(self):
+    #     len_max = np.max(self.len)
+    #     avg_padded = np.zeros((self.num_steps, len_max))
+    #     avg = self.avg_pattern()
+    #     for pattern_avg, pattern_len in zip(avg.data, self.len):
+    #         avg_padded[:pulse_len] = pulse_avg
+    #     plt.imshow(avg_padded)
+    #     plt.show()
+
+
+###########################
+# File IO functionalities #
+###########################
 
 def load(path, num_steps=1, num_files=-1, verbose=True, rebuild_cache=False):
     """
@@ -23,11 +154,15 @@ def load(path, num_steps=1, num_files=-1, verbose=True, rebuild_cache=False):
     NOTES:  A binary cache (.npy) mechanism is implemented in this functioon
     """
 
+    cache_folder_name = 'cache'
+
     def clean_cache():
         try:
             rmtree(join(path, cache_folder_name))
         except:
             pass
+
+    ##END clean_cache
 
     def listdir(path, appendix='txt'):
         """
@@ -48,6 +183,8 @@ def load(path, num_steps=1, num_files=-1, verbose=True, rebuild_cache=False):
                 files.pop(i)
         files = [join(path, f) for _, f in sorted(zip(index, files))]
         return files
+
+    ##END listdir
 
     def loadfile(file_name):
         """
@@ -83,114 +220,7 @@ def load(path, num_steps=1, num_files=-1, verbose=True, rebuild_cache=False):
     seq_rec = Record('sequence', data=data)
     return seq_rec
 
-
+    ##END loadfile
 ##END load
 
 
-class Record():
-    """
-    DESCRIPTION:  The class for record data.
-    FUNCTIONS:
-    """
-
-    def __init__(self, dtype, data=None, delta_t=None):
-        self.dtype = dtype
-        self.data = data
-        self.delta_t = delta_t
-
-        def pattern_init():
-            pass
-
-        def sequence_init():
-            if data:
-                self.num_steps = len(data)
-                self.shapes = np.asarray([pattern_rec_data.shape for pattern_rec_data in data])
-
-        init_funcs = {
-            'pattern': pattern_init,
-            'sequence': sequence_init
-        }
-        init_funcs[dtype]()
-
-    def average_pattern(self, nmin=None, nmax=None, length=0):
-        avg = np.vstack(tuple(np.mean(pattern, axis=0) for pattern in self.data))
-        return avg
-
-    def show(self, mode='sample'):
-        def show_full():
-            stacked_data = np.vstack(tuple(pattern for pattern in self.data))
-            plt.imshow(stacked_data)
-            plt.xlabel('Time index')
-            plt.ylabel('Pattern')
-            plt.show()
-
-        def show_sample():
-            stacked_data = np.vstack(tuple(pattern[1] for pattern in self.data))
-            fig = plt.figure()
-            ax1 = fig.add_subplot(111)
-            ax2 = ax1.twiny()
-            ax1.imshow(stacked_data)
-            ax1.set_xlabel('Time (ns)')
-            ax1.set_ylabel('Steps')
-            ax2.set_xlabel('Time index')
-            ax1.axis('auto')
-            ax1.set_xticklabels(ax1.get_xticks() * self.delta_t * 1E9)
-            ax2.set_xlim(ax1.get_xlim())
-            plt.show()
-
-        def show_average():
-            avg_data = self.average_pattern()
-            plt.imshow(avg_data)
-            plt.xlabel('Time index')
-            plt.ylabel('Pattern')
-            plt.show()
-
-        show_funcs = {
-            'full': show_full,
-            'sample': show_sample,
-            'average': show_average
-        }
-        show_funcs[mode]()
-
-    # def show(self):
-    #     len_max = np.max(self.len)
-    #     avg_padded = np.zeros((self.num_steps, len_max))
-    #     avg = self.avg_pattern()
-    #     for pattern_avg, pattern_len in zip(avg.data, self.len):
-    #         avg_padded[:pulse_len] = pulse_avg
-    #     plt.imshow(avg_padded)
-    #     plt.show()
-
-
-### Pauli algebra ###
-
-sigma_x = [[0, 1], [1, 0]]
-sigma_y = [[0, -1j], [1j, 0]]
-sigma_z = [[1, 0], [0, -1]]
-
-sigma_x = np.asarray(sigma_x)
-sigma_y = np.asarray(sigma_y)
-sigma_z = np.asarray(sigma_z)
-
-sigma = [sigma_x, sigma_y, sigma_z]
-sigma4 = [np.eye(2), sigma_x, sigma_y, sigma_z]
-
-
-def pauli_decomp(rho):
-    """
-        DESCRIPTION:  Calculate the pauli matrix decomposition of the density matrix rho
-        INPUT:  2x2 density matrix rho
-        OUTPUT:  The coefficients
-    """
-    vector4 = [np.trace(rho @ E) / 2 for E in sigma4]
-    return np.asarray(vector4)
-
-
-def bloch_vector(rho):
-    """
-        DESCRIPTION:  Translate the density matrix representation into bloch vector form
-        INPUT:  2x2 density matrix rho
-        OUTPUT:  The bloch vector components
-    """
-    vector = [np.trace(rho @ E) for E in sigma4[1:]]
-    return np.asarray(vector)
