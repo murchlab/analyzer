@@ -8,7 +8,7 @@ Python code for
 
 ## Data visualization
 
-![quantum trajectory sequence](images/quantum_trajectory_sequence.png)
+![quantum trajectory sequence](images/quantum_trajectory_sequence.png =300x)
 
 For the usage please check out
 
