@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 from os import listdir as os_loaddir
 from os.path import isfile, join, exists, split
@@ -58,10 +59,10 @@ def broadcast(f, seq_inputs):
     return [f(*inputs) for inputs in zip(seq_inputs)]
 
 
-def avg_time(self, nmin=[], nmax=[], length=0, stack=False):
+def avg_time(seq_data, nmin=[], nmax=[], length=0, stack=False):
     avg = []
     i = 0
-    for pulse in self.data:
+    for pulse in seq_data:
         if length:
             nmax_i = nmin[i] + length - 1
         else:
@@ -71,6 +72,50 @@ def avg_time(self, nmin=[], nmax=[], length=0, stack=False):
     if stack:
         avg = np.hstack(avg)
     return avg
+
+
+def average_step(seq_data, nmin=None, nmax=None, length=0):
+    avg = np.vstack(tuple(np.mean(step_data, axis=0) for step_data in seq_data))
+    return avg
+
+
+def show(seq_data, mode='sample', delta_t = 20E-9):
+
+    mpl.rcParams['figure.dpi'] = 300
+    def show_full():
+        stacked_data = np.vstack(tuple(pattern for pattern in seq_data))
+        plt.imshow(stacked_data)
+        plt.xlabel('Time index')
+        plt.ylabel('Pattern')
+        plt.show()
+
+    def show_sample():
+        stacked_data = np.vstack(tuple(pattern[1] for pattern in seq_data))
+        fig = plt.figure()
+        ax1 = fig.add_subplot(111)
+        ax2 = ax1.twiny()
+        ax1.imshow(stacked_data)
+        ax1.set_xlabel('Time (ns)')
+        ax1.set_ylabel('Steps')
+        ax2.set_xlabel('Time index')
+        ax1.axis('auto')
+        ax1.set_xticklabels(ax1.get_xticks() * delta_t * 1E9)
+        ax2.set_xlim(ax1.get_xlim())
+        plt.show()
+
+    def show_average():
+        avg_data = average_step(seq_data)
+        plt.imshow(avg_data)
+        plt.xlabel('Time index')
+        plt.ylabel('Pattern')
+        plt.show()
+
+    show_funcs = {
+        'full': show_full,
+        'sample': show_sample,
+        'average': show_average
+    }
+    show_funcs[mode]()
 
 
 class Record():
@@ -241,8 +286,7 @@ def load(path, num_steps=1, num_files=-1, verbose=True, rebuild_cache=False):
     for i in range(num_files):
         seq_rec_i = loadfile(files[i])
         data_list.append(seq_rec_i)
-    data = [np.vstack(seq_rec_i) for seq_rec_i in zip(*data_list)]
-    seq_rec = Record('sequence', data=data)
+    seq_rec = [np.vstack(seq_rec_i) for seq_rec_i in zip(*data_list)]
     return seq_rec
 
     ##END loadfile
