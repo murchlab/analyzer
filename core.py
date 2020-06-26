@@ -49,52 +49,145 @@ def bloch_vector(rho):
 ###################
 
 
-def broadcast(f, seq_inputs):
+def broadcast(f, *seq_inputs):
     """
         DESCRIPTION:  For broadcasting a function over a sequence object
         INPUT:  f:  A function object
                 seq_inputs:  A tuple of sequence data inputs
         OUTPUT:  A list of outputs
     """
-    return [f(*inputs) for inputs in zip(seq_inputs)]
+    return [f(*inputs) for inputs in zip(*seq_inputs)]
 
 
-def avg_time(seq_data, nmin=[], nmax=[], length=0, stack=False):
-    avg = []
-    i = 0
-    for pulse in seq_data:
-        if length:
-            nmax_i = nmin[i] + length - 1
+def datatype(data):
+    """
+        DESCRIPTION:  To determine the type of the input data.
+        INPUT:  data:  A sequence or step or repetition object
+        OUTPUT:  A string 'seq' or 'step' or 'rep' or 'unknown'
+    """
+    if isinstance(data, list):
+        return 'seq'
+    elif isinstance(data, np.ndarray):
+        if data.ndim == 1:
+            return 'rep'
         else:
-            nmax_i = nmax[i]
-        avg.append(np.mean(pulse[:, nmin[i]:nmax_i], axis=1))
-        i += 1
-    if stack:
-        avg = np.hstack(avg)
-    return avg
+            return 'step'
+    return False
 
 
-def average_step(seq_data, nmin=None, nmax=None, length=0):
-    avg = np.vstack(tuple(np.mean(step_data, axis=0) for step_data in seq_data))
-    return avg
+def t_range_parser(data, t_range):
+
+    def step_t_range_parser(step_data, t_range):
+        if t_range:
+            return t_range
+        else:
+            return [0, step_data.shape[-1]]
+
+    def seq_t_range_parser(seq_data, t_range):
+        if not(t_range and hasattr(t_range[0], "__getitem__")):
+            t_range = [t_range] * len(seq_data)
+        t_range = broadcast(step_t_range_parser, seq_data, t_range)
+        return t_range
+
+    data_type = datatype(data)
+
+    funcs = {
+        'seq': seq_t_range_parser,
+        'step': step_t_range_parser,
+    }
+
+    return funcs[data_type](data, t_range)
 
 
-def show(seq_data, mode='sample', delta_t = 20E-9):
+def avg_time(data, t_range=None, stack=False):
 
+    t_range = t_range_parser(data, t_range)
+
+    def step_avg_time(step_data, t_range):
+        """
+            DESCRIPTION:  Calculate the time average of a step data
+            INPUT:  step_data:  2D numpy array
+                    t_range: numpy array [min, max]
+            OUTPUT:  1D numpy array
+        """
+        return np.mean(step_data[:, t_range[0]:t_range[1]], axis=1)
+
+    def seq_avg_time(seq_data, t_range):
+        avg = broadcast(step_avg_time, seq_data, t_range)
+        if stack:
+            avg = np.hstack(avg)
+        return avg
+
+    data_type = datatype(data)
+
+    avg_funcs = {
+        'seq': seq_avg_time,
+        'step': step_avg_time,
+    }
+
+    return avg_funcs[data_type](data, t_range)
+
+
+def avg_rep(data, t_range=None, stack=True):
+
+    t_range = t_range_parser(data, t_range)
+
+    def step_avg_rep(step_data, t_range):
+        """
+            DESCRIPTION:  Calculate the repetition average of a step data
+            INPUT:  step_data:  2D numpy array
+                    t_range: numpy array [min, max]
+            OUTPUT:  1D numpy array
+        """
+        return np.mean(step_data[:, t_range[0]:t_range[1]], axis=0)
+
+    def seq_avg_rep(seq_data, t_range):
+        avg = broadcast(step_avg_rep, seq_data, t_range)
+        if stack:
+            avg = np.vstack(avg)
+        return avg
+
+    data_type = datatype(data)
+
+    avg_funcs = {
+        'seq': seq_avg_rep,
+        'step': step_avg_rep,
+    }
+
+    return avg_funcs[data_type](data, t_range)
+
+
+# def avg_rep(seq_data, nmin=None, nmax=None, length=0):
+#     avg = np.vstack(tuple(np.mean(step_data, axis=0) for step_data in seq_data))
+#     return avg
+
+
+def show(data, mode='sample', delta_t = 20E-9):
     mpl.rcParams['figure.dpi'] = 300
-    def show_full():
-        stacked_data = np.vstack(tuple(pattern for pattern in seq_data))
-        plt.imshow(stacked_data)
-        plt.xlabel('Time index')
-        plt.ylabel('Pattern')
-        plt.show()
 
-    def show_sample():
-        stacked_data = np.vstack(tuple(pattern[1] for pattern in seq_data))
+    def seq_show(seq_data):
+        def plot_data_full():
+            plot_data = np.vstack([step_data for step_data in seq_data])
+            return plot_data
+
+        def plot_data_sample():
+            plot_data = np.vstack([step_data[1] for step_data in seq_data])
+            return plot_data
+
+        def plot_data_average():
+            plot_data = avg_rep(seq_data)
+            return plot_data
+
+        plot_data_funcs = {
+            'full': plot_data_full,
+            'sample': plot_data_sample,
+            'average': plot_data_average
+        }
+        plot_data = plot_data_funcs[mode]()
         fig = plt.figure()
         ax1 = fig.add_subplot(111)
         ax2 = ax1.twiny()
-        ax1.imshow(stacked_data)
+        ax1.imshow(plot_data)
         ax1.set_xlabel('Time (ns)')
         ax1.set_ylabel('Steps')
         ax2.set_xlabel('Time index')
@@ -103,111 +196,7 @@ def show(seq_data, mode='sample', delta_t = 20E-9):
         ax2.set_xlim(ax1.get_xlim())
         plt.show()
 
-    def show_average():
-        avg_data = average_step(seq_data)
-        plt.imshow(avg_data)
-        plt.xlabel('Time index')
-        plt.ylabel('Pattern')
-        plt.show()
-
-    show_funcs = {
-        'full': show_full,
-        'sample': show_sample,
-        'average': show_average
-    }
-    show_funcs[mode]()
-
-
-class Record():
-    """
-    DESCRIPTION:  The class for record data.
-    FUNCTIONS:
-    """
-
-    def __init__(self, dtype, data=None, delta_t=None):
-        self.dtype = dtype
-        self.data = data
-        self.delta_t = delta_t
-
-        def pattern_init():
-            pass
-
-        def sequence_init():
-            if data:
-                self.num_steps = len(data)
-                self.shapes = np.asarray([pattern_rec_data.shape for pattern_rec_data in data])
-
-        init_funcs = {
-            'pattern': pattern_init,
-            'sequence': sequence_init
-        }
-        init_funcs[dtype]()
-
-    # Average can be evaluated along two axes
-
-    def avg_time(self, nmin=[], nmax=[], length=0, stack=False):
-        avg = []
-        i = 0
-        for pulse in self.data:
-            if length:
-                nmax_i = nmin[i] + length - 1
-            else:
-                nmax_i = nmax[i]
-            avg.append(np.mean(pulse[:, nmin[i]:nmax_i], axis=1))
-            i += 1
-        if stack:
-            avg = np.hstack(avg)
-        return avg
-
-    def average_step(self, nmin=None, nmax=None, length=0):
-        avg = np.vstack(tuple(np.mean(step_data, axis=0) for step_data in self.data))
-        return avg
-
-    def show(self, mode='sample'):
-        def show_full():
-            stacked_data = np.vstack(tuple(pattern for pattern in self.data))
-            plt.imshow(stacked_data)
-            plt.xlabel('Time index')
-            plt.ylabel('Pattern')
-            plt.show()
-
-        def show_sample():
-            stacked_data = np.vstack(tuple(pattern[1] for pattern in self.data))
-            fig = plt.figure()
-            ax1 = fig.add_subplot(111)
-            ax2 = ax1.twiny()
-            ax1.imshow(stacked_data)
-            ax1.set_xlabel('Time (ns)')
-            ax1.set_ylabel('Steps')
-            ax2.set_xlabel('Time index')
-            ax1.axis('auto')
-            ax1.set_xticklabels(ax1.get_xticks() * self.delta_t * 1E9)
-            ax2.set_xlim(ax1.get_xlim())
-            plt.show()
-
-        def show_average():
-            avg_data = self.average_step()
-            plt.imshow(avg_data)
-            plt.xlabel('Time index')
-            plt.ylabel('Pattern')
-            plt.show()
-
-        show_funcs = {
-            'full': show_full,
-            'sample': show_sample,
-            'average': show_average
-        }
-        show_funcs[mode]()
-
-    # def show(self):
-    #     len_max = np.max(self.len)
-    #     avg_padded = np.zeros((self.num_steps, len_max))
-    #     avg = self.avg_pattern()
-    #     for pattern_avg, pattern_len in zip(avg.data, self.len):
-    #         avg_padded[:pulse_len] = pulse_avg
-    #     plt.imshow(avg_padded)
-    #     plt.show()
-
+    seq_show(data)
 
 #####################
 # File IO functions #

@@ -17,8 +17,8 @@ For the usage please check out
 ## Design logic
 
 * Native python data types are preferred (without introducing too many customized classes)
-* A **sequence** comprises many **steps**
-* A **sequence** object is implemented as a python `list` of the corresponding **step** objects
-* The name for a **sequence** object usually starts with an extra `seq_` prefix. The name for a **step** object sometimes starts with an extra `step_` prefix.
+* One **sequence** comprises many **steps** and one **steps** comprises many **repetitions**.
+* A **sequence** object is implemented as a python `list` of the corresponding **step** objects. `numpy.ndarray` is not used for this purpose because in many cases the comprising step objects have different sizes. (e.g. due to post-selection)
+* The name for a **sequence** object usually starts with an extra `seq_` prefix. The name for a **step** object sometimes starts with an extra `step_` prefix. The name for a **repetition** object sometimes starts with an extra `rep_` prefix.
 * The function `analyzer.broadcast` is for broadcasting a function over a **sequence** object
 * `num_step` defines the number of steps in a sequence
