@@ -16,6 +16,10 @@ For the usage please check out
 
 ## Projective measurement calibration
 
+<img src="images/averaging_region.png" width="600">
+
+The purple region is the selected data area for averaging. In this example it's the measurement result of the herald pulse.
+
 <img src="images/measurement_calibration.png" width="600">
 
 For the usage please check out
