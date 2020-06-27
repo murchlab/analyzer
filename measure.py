@@ -1,5 +1,3 @@
-import numpy as np
-import matplotlib.pyplot as plt
 import matplotlib.transforms as transforms
 from sklearn import mixture
 from analyzer import *
@@ -47,6 +45,7 @@ def measurehist(data, t_range, fit=True, n_components=3, log_scale=True, show_pl
     plt.xlabel('Signal $V$')
     plt.ylabel('Probability distribution $f(V)$')
 
+    thresholds = None
     if fit:
         weights, means, covariances = gmm_fit()
         weights = weights.flatten()
@@ -74,115 +73,56 @@ def measurehist(data, t_range, fit=True, n_components=3, log_scale=True, show_pl
         plt.yscale("log")
     if show_plot:
         plt.show()
+    return thresholds
 
 
-def edge_filter(pulse):
-    tau = 60 * 1E-9
-    dt = 20 * 1E-9
-    conv_len = int(2 * tau / dt)
+def crop(data, t_range):
 
-    exp = np.exp(- dt / tau)
-    kernel = np.array([exp ** i for i in range(conv_len)])
-    kernel /= np.sum(kernel)
-    # kernel = np.append([0.2, 0.8], -kernel)
-    # pulse = np.pad(pulse, (conv_len, 1), "edge")
-    kernel = np.append(1, -kernel)
-    pulse = np.pad(pulse, (conv_len, 0), "edge")
-    pulse = np.convolve(pulse, kernel, mode='valid')
-    std = np.std(pulse)
-    mean = np.mean(pulse)
-    pulse[np.abs(pulse - mean) < 1 * std] = 0
-    pulse = np.abs(pulse)
-    return pulse
+    t_range = t_range_parser(data, t_range)
 
+    def step_crop(step_data, step_t_range):
+        return step_data[:, step_t_range[0]:step_t_range[1]]
 
-def separate(pulse, sep_list):
-    out = np.zeros(pulse.shape)
-    last_point = 0
-    sep_list.append(len(pulse))
-    pair_list = []
-    pulse -= np.mean(pulse)
-    pulse /= np.std(pulse)
-    for point in sep_list:
-        pair_list.append([last_point, point, np.mean(pulse[last_point:point])])
-        last_point = point
-    i = len(pair_list) - 2
-    while i >= 0:
-        # print(i)
-        h = np.abs(pair_list[i + 1][2] - pair_list[i][2])
-        if h * (pair_list[i][1] - pair_list[i][0]) < 5:
-            pair_list[i + 1][0] = pair_list[i][0]
-            pair_list[i + 1][2] = np.mean(pulse[pair_list[i][0]:pair_list[i + 1][1]])
-            pair_list.pop(i)
-        i -= 1
-    i = len(pair_list) - 2
-    while i > 0:
-        if (pair_list[i][1] - pair_list[i][0]) < 10 and (pair_list[i][2] - pair_list[i - 1][2]) * (pair_list[i][2] - pair_list[i + 1][2]) > 0:
-            pair_list[i + 1][0] = pair_list[i][0]
-            # pair_list[i + 1][2] = np.mean(pulse[pair_list[i][0]:pair_list[i + 1][1]])
-            pair_list.pop(i)
-        i -= 1
-    for a, b, value in pair_list:
-        out[a:b] = value
-    return out, pair_list
+    def seq_crop(seq_data, t_range):
+        return broadcast(step_crop, seq_data, t_range)
+
+    data_type = datatype(data)['type']
+
+    crop_funcs = {
+        'seq': seq_crop,
+        'step': step_crop,
+    }
+
+    return crop_funcs[data_type](data, t_range)
 
 
-def projective(pulse, sensitivity=1.0, verbose=True, num=2):
-    tau = 60 * 1E-9
-    dt = 20 * 1E-9
-    filtered = edge_filter(pulse)
-    # plt.plot(pulse)
-    # plt.show()
-    pair_list = []
-    last_idx = -1
-    for idx in np.nonzero(filtered)[0]:
-        if idx > last_idx + 1:
-            pair_list.append(idx)
-        last_idx = idx
-    return pair_list
+def select(data, state, t_range, thresholds, num_only=False):
 
+    t_range = t_range_parser(data, t_range)
 
-def projective2(seq, nmin=[], nmax=[]):
-    avg = sq.avg_time(seq, nmin=nmin, nmax=nmax)
-    avg_stack = np.hstack(avg)
-    gmm = mixture.GaussianMixture(n_components=2)
-    result = []
-    gmm.fit(avg_stack.reshape(-1, 1))
-    for pulse in avg:
-        result.append(gmm.predict(pulse.reshape(-1, 1)))
-    return result, gmm
+    avg = avg_time(data, t_range)
 
+    if not hasattr(thresholds, '__getitem__'):
+        thresholds = [thresholds]
 
-def projective3(seq, threshold, nmin=[], nmax=[]):
-    avg = sq.avg_time(seq, nmin=nmin, nmax=nmax)
-    result = []
-    for avg_pulse in avg:
-        result_pulse = np.full(avg_pulse.shape, -1)
-        state_index = 0
-        for lower, upper in threshold:
-            result_pulse[np.logical_and(avg_pulse >= lower, avg_pulse < upper)] = state_index
-            state_index += 1
-        result.append(result_pulse)
-    return result
+    thresholds = np.insert(thresholds, 0, -np.inf)
+    thresholds = np.append(thresholds, np.inf)
 
+    def step_select(step_data, step_avg):
+        selected = step_data[np.logical_and(step_avg > thresholds[state], step_avg < thresholds[state + 1]), :]
+        if num_only:
+            return len(selected)
+        return selected
 
-def selection(seq, measure_cond, return_num=False):
-    result = []
-    seq_cond = []
-    if isinstance(measure_cond, tuple):
-        measure_cond = [measure_cond]
-    for pulse in seq:
-        seq_cond.append(np.full(pulse.shape[0], True))
-    for i in range(len(seq_cond)):
-        for m_cond in measure_cond:
-            seq_cond[i] = np.logical_and(seq_cond[i], m_cond[0][i] == m_cond[1])
-    if return_num:
-        for i in range(len(seq)):
-            result.append(np.sum(seq_cond[i]))
-        result = np.array(result)
-    else:
-        i = 0
-        for pulse in seq:
-            result.append(pulse[seq_cond[i]])
-            i += 1
-    return result
+    def seq_select(seq_data, avg):
+        selected = broadcast(step_select, seq_data, avg)
+        return selected
+
+    data_type = datatype(data)['type']
+
+    select_funcs = {
+        'seq': seq_select,
+        'step': step_select,
+    }
+
+    return select_funcs[data_type](data, avg)

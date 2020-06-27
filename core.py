@@ -1,8 +1,6 @@
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-from mpl_toolkits.axes_grid1 import make_axes_locatable
-import matplotlib.gridspec as gridspec
 from os import listdir as os_loaddir
 from os.path import isfile, join, exists, split
 from os import mkdir, stat
@@ -250,7 +248,7 @@ def show(data, t_range=None, mode='sample', delta_t=20E-9, show_plot=True):
             return plot_data
 
         def plot_data_sample():
-            plot_data = np.vstack([step_data[1] for step_data in seq_data])
+            plot_data = np.vstack([step_data[0] for step_data in seq_data])
             return plot_data
 
         def plot_data_average():
@@ -276,7 +274,9 @@ def show(data, t_range=None, mode='sample', delta_t=20E-9, show_plot=True):
         ax1.set_ylabel('Steps')
         ax2.set_xlabel('Time index')
         ax1.axis('auto')
-        ax1.set_xticklabels(ax1.get_xticks() * delta_t * 1E9)
+        xtick_values = ax1.get_xticks() * delta_t * 1E9
+        xtick_strings = ['{:.0f}'.format(xtick_value) for xtick_value in xtick_values]
+        ax1.set_xticklabels(xtick_strings)
         ax2.set_xlim(ax1.get_xlim())
         plt.tight_layout(w_pad=-100)
 
