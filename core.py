@@ -193,13 +193,55 @@ def bloch_vector(rho):
     vector = [np.trace(rho @ E) for E in sigma4[1:]]
     return np.asarray(vector)
 
+
+# Calculate threshold from Gaussian parameters
+
+
+def gaussian2thresholds(means, covariances):
+
+    gaussian_params = np.asarray([[m, c] for m, c in sorted(zip(means, covariances))])
+    means, covariances = gaussian_params.transpose()
+
+    def gaussian2threshold_2pt(means, covariances):
+        if covariances[0] == covariances[1]:
+            return (means[0] + means[1]) / 2
+        a = 1 / covariances[0] - 1 / covariances[1]
+        b = - 2 * (means[0] / covariances[0] - means[1] / covariances[1])
+        c = (means[0]**2 / covariances[0] - means[1]**2 / covariances[1]) + np.log(covariances[0]) - np.log(covariances[1])
+        delta = b**2 - 4 * a * c
+        if delta < 0:
+            return (means[0] + means[1]) / 2
+        if -(b / (2 * a)) < (means[0] + means[1]) / 2:
+            x = (-b + np.sqrt(delta)) / (2 * a)
+        else:
+            x = (-b - np.sqrt(delta)) / (2 * a)
+        if (x - means[0]) * (x - means[1]) < 0:
+            return x
+        else:
+            return (means[0] + means[1]) / 2
+
+    thresholds = []
+    for i in range(len(means) - 1):
+        thresholds.append(gaussian2threshold_2pt(means[i:i + 2], covariances[i:i + 2]))
+    return thresholds
+
+
+
 ######################
 # Data Visualization #
 ######################
 
+# Global settings
+
+
+mpl.rcParams['figure.dpi'] = 300
+barplot_color='#aacfcf'
+
+
+# Plotting sequence record
+
 
 def show(data, t_range=None, mode='sample', delta_t=20E-9, show_plot=True):
-    mpl.rcParams['figure.dpi'] = 300
     ax1 = None
 
     def seq_show(seq_data):
@@ -244,19 +286,21 @@ def show(data, t_range=None, mode='sample', delta_t=20E-9, show_plot=True):
         num_reps = datatype(data)['num_reps']
         t_max = datatype(data)['t_max'][0]
 
+        color = [0xff, 0x00, 0xff]
+
         def t_range_data_full():
-            t_range_data = np.zeros((num_steps * np.sum(num_reps), t_max))
+            t_range_data = np.full((np.sum(num_reps), t_max, 3), 255, dtype=np.int)
             i = 0
-            for step_t_range, step_num_reps in (t_range, num_reps):
-                t_range_data[i:i + step_num_reps, step_t_range[0]:step_t_range[1]] = 1
+            for step_t_range, step_num_reps in zip(t_range, num_reps):
+                t_range_data[i:i + step_num_reps, step_t_range[0]:step_t_range[1]] = color
                 i += step_num_reps
             return t_range_data
 
         def t_range_data_sample_or_average():
-            t_range_data = np.zeros((num_steps, t_max))
+            t_range_data = np.full((num_steps, t_max, 3), 255, dtype=np.int)
             i = 0
             for step_t_range in t_range:
-                t_range_data[i, step_t_range[0]:step_t_range[1]] = 1
+                t_range_data[i, step_t_range[0]:step_t_range[1]] = color
                 i += 1
             return t_range_data
 
@@ -267,7 +311,7 @@ def show(data, t_range=None, mode='sample', delta_t=20E-9, show_plot=True):
         }
         t_range_data = t_range_data_funcs[mode]()
         global ax1
-        ax1.imshow(t_range_data, alpha=0.2)
+        ax1.imshow(t_range_data, alpha=0.3)
         ax1.axis('auto')
 
     seq_show(data)

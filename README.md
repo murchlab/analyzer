@@ -14,6 +14,14 @@ For the usage please check out
 
 `examples/display_sequence.py`
 
+## Projective measurement calibration
+
+<img src="images/measurement_calibration.png" width="600">
+
+For the usage please check out
+
+`examples/measurement_calibration.py`
+
 ## Design logic
 
 * Native python data types are preferred (without introducing too many customized classes)

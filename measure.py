@@ -1,25 +1,79 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.transforms as transforms
 from sklearn import mixture
-# import toolbox.sequence as sq
+from analyzer import *
+from scipy import constants
 
 
-def measurehist(seq, nmin=[], nmax=[], log=False):
-    avg = sq.avg_time(seq, nmin=nmin, nmax=nmax, stack=True)
-    plothist = plt.hist(avg, bins="auto", density=True)
-    if log:
+def measurehist(data, t_range, fit=True, n_components=3, log_scale=True, show_plot=True, calc_temp=False, qubit_freq=None):
+
+    fit_color = '#16817a'
+    thresholds_color = '#035aa6'
+    T_color = '#8566aa'
+    plot_bottom = 1E-4
+    thresholds_dashline_y = 0.73
+    thresholds_text_y = 0.75
+    T_text_x = 0.9
+    T_text_y = 0.95
+    # For performance considerations, here I am not sampling the whole data set while calculating the min & max and
+    # performing the first step fittinig.
+    sample_num = 100000
+
+    avg = avg_time(data, t_range, stack=True)
+    fig = plt.figure()
+    ax = fig.add_subplot(1, 1, 1)
+    plt.hist(avg, bins="auto", density=True, color=barplot_color)
+
+    def gmm_fit():
+
+        min = np.min(avg[:sample_num])
+        max = np.max(avg[:sample_num])
+        mean_init = np.linspace(min, max, n_components)
+        gmm_tied = mixture.GaussianMixture(n_components, means_init=mean_init.reshape(-1, 1),
+                                           covariance_type='tied', tol=1E-10, n_init=5)
+        gmm_tied.fit(avg[:sample_num].reshape(-1, 1))
+        print(gmm_tied.means_)
+        gmm = mixture.GaussianMixture(n_components, weights_init=gmm_tied.weights_, means_init=gmm_tied.means_,
+                                      max_iter=100, tol=1E-100, warm_start=False)
+        gmm.fit(avg.reshape(-1, 1))
+        # gmm = gmm_tied
+        x_eval = np.histogram_bin_edges(avg, bins="auto")
+
+        plt.plot(x_eval, np.exp(gmm.score_samples(x_eval.reshape(-1, 1))), color=fit_color)
+        plt.ylim(bottom=plot_bottom)
+        return gmm.weights_, gmm.means_, gmm.covariances_
+
+    plt.xlabel('Signal $V$')
+    plt.ylabel('Probability distribution $f(V)$')
+
+    if fit:
+        weights, means, covariances = gmm_fit()
+        weights = weights.flatten()
+        means = means.flatten()
+        covariances = covariances.flatten()
+        fit_params = np.asarray([[w, m, c] for w, m, c in sorted(zip(weights, means, covariances), reverse=True)])
+        weights, means, covariances = fit_params.transpose()
+        # print(fit_params)
+        thresholds = gaussian2thresholds(means, covariances)
+        print("Thresholds:")
+        print(thresholds)
+        trans = transforms.blended_transform_factory(ax.transData, ax.transAxes)
+        for threshold in thresholds:
+            plt.axvline(threshold, plot_bottom, thresholds_dashline_y, linestyle='--', color=thresholds_color)
+            plt.text(threshold, thresholds_text_y, '{:.2f}'.format(threshold), horizontalalignment='center',
+                     color=thresholds_color, transform=trans)
+        if calc_temp:
+            h = constants.h
+            k = constants.k
+            T = h * qubit_freq / k / (np.log(weights[0]) - np.log(weights[1]))
+            print("T = {} mK".format(T * 1E3))
+            plt.text(T_text_x, T_text_y, 'T = {:.2f} mK'.format(T * 1E3), horizontalalignment='center',
+                     color=T_color, transform=ax.transAxes)
+    if log_scale:
         plt.yscale("log")
-    return plothist
-
-
-def fit(seq, nmin=[], nmax=[]):
-    gmm = mixture.GaussianMixture(n_components=3)
-    # gmm.set_params(max_iter=100, tol=1E-10, verbose=1)
-    avg = sq.avg_time(seq, nmin=nmin, nmax=nmax, stack=True)
-    gmm.fit(avg.reshape(-1, 1))
-    x_eval = np.histogram_bin_edges(avg, bins="auto")
-    plt.plot(x_eval, np.exp(gmm.score_samples(x_eval.reshape(-1, 1))), 'g-')
-    return (gmm.means_, gmm.covariances_)
+    if show_plot:
+        plt.show()
 
 
 def edge_filter(pulse):
