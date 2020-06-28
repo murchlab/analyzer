@@ -26,7 +26,7 @@ For the usage please check out
 
 `examples/measurement_calibration.py`
 
-## Visualization of the measurement record
+## Tomographic Validation
 
 <img src="images/tomographic_validation.png" width="600">
 
