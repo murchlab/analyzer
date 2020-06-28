@@ -287,14 +287,16 @@ def show(data, t_range=None, mode='sample', delta_t=20E-9, show_plot=True):
     def rep_show(rep_data):
         fig = plt.figure()
         ax1 = fig.add_subplot(1, 1, 1)
-        t_space = np.arange(0, delta_t * datatype(rep_data)['t_max'], delta_t)
-        plt.plot(t_space * 1E9, rep_data)
+        plt.plot(rep_data)
         ax2 = ax1.twiny()
         ax1.set_xlabel('Time (ns)')
         ax1.set_ylabel('Signal $V$')
         ax2.set_xlabel('Time index')
         ax1.axis('auto')
-        ax2.set_xlim(np.asarray(ax1.get_xlim()) / delta_t * 1E-9)
+        xtick_values = ax1.get_xticks() * delta_t * 1E9
+        xtick_strings = ['{:.0f}'.format(xtick_value) for xtick_value in xtick_values]
+        ax1.set_xticklabels(xtick_strings)
+        ax2.set_xlim(ax1.get_xlim())
 
         def t_range_show(t_range):
             trans = transforms.blended_transform_factory(ax1.transData, ax1.transAxes)
