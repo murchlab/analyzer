@@ -1,7 +1,6 @@
 import matplotlib.transforms as transforms
 from sklearn import mixture
 from analyzer import *
-from scipy import constants
 
 
 def measurehist(data, t_range, fit=True, n_components=3, log_scale=True, show_plot=True, calc_temp=False, qubit_freq=None):
@@ -12,7 +11,7 @@ def measurehist(data, t_range, fit=True, n_components=3, log_scale=True, show_pl
     plot_bottom = 1E-4
     thresholds_dashline_y = 0.73
     thresholds_text_y = 0.75
-    T_text_x = 0.9
+    T_text_x = 0.98
     T_text_y = 0.95
     # For performance considerations, here I am not sampling the whole data set while calculating the min & max and
     # performing the first step fittinig.
@@ -63,11 +62,9 @@ def measurehist(data, t_range, fit=True, n_components=3, log_scale=True, show_pl
             plt.text(threshold, thresholds_text_y, '{:.2f}'.format(threshold), horizontalalignment='center',
                      color=thresholds_color, transform=trans)
         if calc_temp:
-            h = constants.h
-            k = constants.k
-            T = h * qubit_freq / k / (np.log(weights[0]) - np.log(weights[1]))
+            T = qubit_temp(weights[0], weights[1], qubit_freq)
             print("T = {} mK".format(T * 1E3))
-            plt.text(T_text_x, T_text_y, 'T = {:.2f} mK'.format(T * 1E3), horizontalalignment='center',
+            plt.text(T_text_x, T_text_y, 'T = {:.2f} mK'.format(T * 1E3), horizontalalignment='right',
                      color=T_color, transform=ax.transAxes)
     if log_scale:
         plt.yscale("log")
@@ -113,6 +110,41 @@ def select(data, state, t_range, thresholds, num_only=False):
         if num_only:
             return len(selected)
         return selected
+
+    def seq_select(seq_data, avg):
+        selected = broadcast(step_select, seq_data, avg)
+        return selected
+
+    data_type = datatype(data)['type']
+
+    select_funcs = {
+        'seq': seq_select,
+        'step': step_select,
+    }
+
+    return select_funcs[data_type](data, avg)
+
+
+def population(data, t_range, thresholds):
+
+    t_range = t_range_parser(data, t_range)
+
+    avg = avg_time(data, t_range)
+
+    if not hasattr(thresholds, '__getitem__'):
+        thresholds = [thresholds]
+
+    thresholds = np.insert(thresholds, 0, -np.inf)
+    thresholds = np.append(thresholds, np.inf)
+
+    def step_select(step_data, step_avg):
+        N_tot = datatype(step_data)['num_reps']
+        N_states = []
+        for state in range(len(thresholds) - 1):
+            N_state = np.sum(np.logical_and(step_avg > thresholds[state], step_avg < thresholds[state + 1]))
+            N_states.append(N_state)
+        N_states = np.asarray(N_states)
+        return N_states / N_tot
 
     def seq_select(seq_data, avg):
         selected = broadcast(step_select, seq_data, avg)

@@ -1,11 +1,14 @@
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+import matplotlib.transforms as transforms
+import matplotlib.patches as mpatches
 from os import listdir as os_loaddir
 from os.path import isfile, join, exists, split
 from os import mkdir, stat
 from shutil import rmtree
 import re
+from scipy import constants
 
 
 ###################
@@ -57,9 +60,16 @@ def datatype(data):
             't_max': t_max
         }
 
+    def rep_shape(rep_data):
+        t_max = rep_data.shape[-1]
+        return {
+            't_max': t_max
+        }
+
     shape_funcs = {
         'seq': seq_shape,
-        'step': step_shape
+        'step': step_shape,
+        'rep': rep_shape
     }
 
     data_type_dict = data_type(data)
@@ -122,7 +132,7 @@ def avg_time(data, t_range=None, stack=False):
 
     avg_funcs = {
         'seq': seq_avg_time,
-        'step': step_avg_time,
+        'step': step_avg_time
     }
 
     return avg_funcs[data_type](data, t_range)
@@ -155,6 +165,33 @@ def avg_rep(data, t_range=None, stack=True):
     }
 
     return avg_funcs[data_type](data, t_range)
+
+
+# Rescaling
+
+
+def rescale(data, offset, scale):
+    """
+        DESCRIPTION: (data + offset) * scale
+                     for weak measurement: scale = 2 / delta_V
+        INPUT:
+        OUTPUT:
+    """
+    def step_rescale(step_data):
+        return (step_data + offset) * scale
+
+    def seq_rescale(seq_data):
+        rescaled = broadcast(step_rescale, seq_data)
+        return rescaled
+
+    data_type = datatype(data)['type']
+
+    avg_funcs = {
+        'seq': seq_rescale,
+        'step': step_rescale,
+    }
+
+    return avg_funcs[data_type](data)
 
 
 # Pauli algebra
@@ -224,6 +261,12 @@ def gaussian2thresholds(means, covariances):
     return thresholds
 
 
+def qubit_temp(P_g, P_e, qubit_freq):
+    h = constants.h
+    k = constants.k
+    T = h * qubit_freq / k / (np.log(P_g) - np.log(P_e))
+    return T
+
 
 ######################
 # Data Visualization #
@@ -240,7 +283,45 @@ barplot_color='#aacfcf'
 
 
 def show(data, t_range=None, mode='sample', delta_t=20E-9, show_plot=True):
-    ax1 = None
+
+    def rep_show(rep_data):
+        fig = plt.figure()
+        ax1 = fig.add_subplot(1, 1, 1)
+        plt.plot(rep_data)
+        ax2 = ax1.twiny()
+        ax1.set_xlabel('Time (ns)')
+        ax1.set_ylabel('Signal $V$')
+        ax2.set_xlabel('Time index')
+        ax1.axis('auto')
+        xtick_values = ax1.get_xticks() * delta_t * 1E9
+        xtick_strings = ['{:.0f}'.format(xtick_value) for xtick_value in xtick_values]
+        ax1.set_xticklabels(xtick_strings)
+        ax2.set_xlim(ax1.get_xlim())
+
+        def t_range_show(t_range):
+            trans = transforms.blended_transform_factory(ax1.transData, ax1.transAxes)
+            rect = mpatches.Rectangle((t_range[0], 0), width=t_range[1] - t_range[0], height=1, transform=trans,
+                                      color='yellow', alpha=0.5)
+
+            ax1.add_patch(rect)
+
+        if t_range:
+            t_range_show(t_range)
+
+    def step_show(step_data):
+        def plot_data_sample():
+            return step_data[0]
+
+        def plot_data_average():
+            return avg_rep(step_data)
+
+        plot_data_funcs = {
+            'sample': plot_data_sample,
+            'average': plot_data_average
+        }
+
+        plot_data = plot_data_funcs[mode]()
+        rep_show(plot_data)
 
     def seq_show(seq_data):
         def plot_data_full():
@@ -260,7 +341,6 @@ def show(data, t_range=None, mode='sample', delta_t=20E-9, show_plot=True):
             'sample': plot_data_sample,
             'average': plot_data_average
         }
-        global ax1
         plot_data = plot_data_funcs[mode]()
         fig = plt.figure()
 
@@ -280,43 +360,51 @@ def show(data, t_range=None, mode='sample', delta_t=20E-9, show_plot=True):
         ax2.set_xlim(ax1.get_xlim())
         plt.tight_layout(w_pad=-100)
 
-    def t_range_show(t_range):
-        t_range = t_range_parser(data, t_range)
-        num_steps = datatype(data)['num_steps']
-        num_reps = datatype(data)['num_reps']
-        t_max = datatype(data)['t_max'][0]
+        def t_range_show(t_range):
+            t_range = t_range_parser(data, t_range)
+            num_steps = datatype(data)['num_steps']
+            num_reps = datatype(data)['num_reps']
+            t_max = datatype(data)['t_max'][0]
 
-        color = [0xff, 0x00, 0xff]
+            color = [0xff, 0x00, 0xff]
 
-        def t_range_data_full():
-            t_range_data = np.full((np.sum(num_reps), t_max, 3), 255, dtype=np.int)
-            i = 0
-            for step_t_range, step_num_reps in zip(t_range, num_reps):
-                t_range_data[i:i + step_num_reps, step_t_range[0]:step_t_range[1]] = color
-                i += step_num_reps
-            return t_range_data
+            def t_range_data_full():
+                t_range_data = np.full((np.sum(num_reps), t_max, 3), 255, dtype=np.int)
+                i = 0
+                for step_t_range, step_num_reps in zip(t_range, num_reps):
+                    t_range_data[i:i + step_num_reps, step_t_range[0]:step_t_range[1]] = color
+                    i += step_num_reps
+                return t_range_data
 
-        def t_range_data_sample_or_average():
-            t_range_data = np.full((num_steps, t_max, 3), 255, dtype=np.int)
-            i = 0
-            for step_t_range in t_range:
-                t_range_data[i, step_t_range[0]:step_t_range[1]] = color
-                i += 1
-            return t_range_data
+            def t_range_data_sample_or_average():
+                t_range_data = np.full((num_steps, t_max, 3), 255, dtype=np.int)
+                i = 0
+                for step_t_range in t_range:
+                    t_range_data[i, step_t_range[0]:step_t_range[1]] = color
+                    i += 1
+                return t_range_data
 
-        t_range_data_funcs = {
-            'full': t_range_data_full,
-            'sample': t_range_data_sample_or_average,
-            'average': t_range_data_sample_or_average
-        }
-        t_range_data = t_range_data_funcs[mode]()
-        global ax1
-        ax1.imshow(t_range_data, alpha=0.3)
-        ax1.axis('auto')
+            t_range_data_funcs = {
+                'full': t_range_data_full,
+                'sample': t_range_data_sample_or_average,
+                'average': t_range_data_sample_or_average
+            }
+            t_range_data = t_range_data_funcs[mode]()
+            ax1.imshow(t_range_data, alpha=0.3)
+            ax1.axis('auto')
 
-    seq_show(data)
-    if t_range:
-        t_range_show(t_range)
+        if t_range:
+            t_range_show(t_range)
+
+    data_type = datatype(data)['type']
+
+    show_funcs = {
+        'seq': seq_show,
+        'step': step_show,
+        'rep': rep_show
+    }
+
+    show_funcs[data_type](data)
     if show_plot:
         plt.show()
 

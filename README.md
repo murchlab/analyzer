@@ -4,9 +4,9 @@ Version  0.1
 Python code for
 
 * Reading data from the instruments
-* Analyzing and processing the measurement data
+* Analyzing the measurement data
 
-## Data visualization
+## Visualization of the measurement record
 
 <img src="images/quantum_trajectory_sequence.png" width="600">
 
@@ -25,6 +25,14 @@ The purple region is the selected data area for averaging. In this example it's 
 For the usage please check out
 
 `examples/measurement_calibration.py`
+
+## Visualization of the measurement record
+
+<img src="images/tomographic_validation.png" width="600">
+
+For the usage please check out
+
+`examples/tomographic_validation.py`
 
 ## Design logic
 
