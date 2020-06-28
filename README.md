@@ -26,7 +26,7 @@ For the usage please check out
 
 `examples/measurement_calibration.py`
 
-## Tomographic Validation
+## Quantum trajectory
 
 <img src="images/tomographic_validation.png" width="600">
 
