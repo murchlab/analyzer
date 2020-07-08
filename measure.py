@@ -125,7 +125,7 @@ def select(data, state, t_range, thresholds, num_only=False):
     return select_funcs[data_type](data, avg)
 
 
-def population(data, t_range, thresholds):
+def population(data, t_range, thresholds, normalized=True):
 
     t_range = t_range_parser(data, t_range)
 
@@ -144,7 +144,10 @@ def population(data, t_range, thresholds):
             N_state = np.sum(np.logical_and(step_avg > thresholds[state], step_avg < thresholds[state + 1]))
             N_states.append(N_state)
         N_states = np.asarray(N_states)
-        return N_states / N_tot
+        if normalized:
+            return N_states / N_tot
+        else:
+            return N_states
 
     def seq_select(seq_data, avg):
         selected = broadcast(step_select, seq_data, avg)
