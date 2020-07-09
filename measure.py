@@ -32,7 +32,7 @@ def measurehist(data, t_range, fit=True, n_components=3, log_scale=True, show_pl
         gmm_tied.fit(avg[:sample_num].reshape(-1, 1))
         print(gmm_tied.means_)
         gmm = mixture.GaussianMixture(n_components, weights_init=gmm_tied.weights_, means_init=gmm_tied.means_,
-                                      max_iter=100, tol=1E-100, warm_start=False)
+                                      max_iter=1000, tol=1E-100, warm_start=False)
         gmm.fit(avg.reshape(-1, 1))
         # gmm = gmm_tied
         x_eval = np.histogram_bin_edges(avg, bins="auto")

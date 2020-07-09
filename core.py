@@ -413,7 +413,7 @@ def show(data, t_range=None, mode='sample', delta_t=20E-9, show_plot=True):
 #####################
 
 
-def load(path, num_steps=1, num_files=-1, verbose=True, rebuild_cache=False):
+def load(path, num_steps=1, num_files=-1, offset=0, verbose=True, rebuild_cache=False):
     """
     DESCRIPTION:  Load the record data from .txt files
     INPUT:  path:  the directory of the measurement record
@@ -477,13 +477,13 @@ def load(path, num_steps=1, num_files=-1, verbose=True, rebuild_cache=False):
 
     files = listdir(path)
     if num_files == -1:
-        num_files = len(files)
+        num_files = len(files) - offset
     data_list = []
     if rebuild_cache:
         clean_cache()
     if rebuild_cache or (not exists(join(path, cache_folder_name))):
         mkdir(join(path, cache_folder_name))
-    for i in range(num_files):
+    for i in range(offset, offset + num_files):
         seq_rec_i = loadfile(files[i])
         data_list.append(seq_rec_i)
     seq_rec = [np.vstack(seq_rec_i) for seq_rec_i in zip(*data_list)]
