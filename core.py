@@ -267,6 +267,14 @@ def qubit_temp(P_g, P_e, qubit_freq):
     T = h * qubit_freq / k / (np.log(P_g) - np.log(P_e))
     return T
 
+# Quantum Information
+
+
+def z2info(z):
+    log = np.log
+    P0 = (1 + z) / 2
+    P1 = (1 - z) / 2
+    return P0 * log(P0) + P1 * log(P1)
 
 ######################
 # Data Visualization #
