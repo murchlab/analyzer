@@ -93,7 +93,7 @@ def crop(data, t_range):
     return crop_funcs[data_type](data, t_range)
 
 
-def select(data, state, t_range, thresholds, num_only=False):
+def select(data, state, t_range, thresholds, num_only=False, return_index=False):
 
     t_range = t_range_parser(data, t_range)
 
@@ -106,9 +106,13 @@ def select(data, state, t_range, thresholds, num_only=False):
     thresholds = np.append(thresholds, np.inf)
 
     def step_select(step_data, step_avg):
-        selected = step_data[np.logical_and(step_avg > thresholds[state], step_avg < thresholds[state + 1]), :]
+        mask = np.logical_and(step_avg > thresholds[state], step_avg < thresholds[state + 1])
+        index = np.where(mask)
+        if return_index:
+            return index
         if num_only:
-            return len(selected)
+            return len(index)
+        selected = step_data[mask, :]
         return selected
 
     def seq_select(seq_data, avg):
