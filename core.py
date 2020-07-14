@@ -44,7 +44,7 @@ def datatype(data):
 
     def seq_shape(seq_data):
         num_steps = len(seq_data)
-        num_reps = [step_data.shape[0] for step_data in seq_data]
+        num_reps = np.asarray([step_data.shape[0] for step_data in seq_data])
         t_max = [step_data.shape[-1] for step_data in seq_data]
         return {
             'num_steps': num_steps,
