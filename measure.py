@@ -107,7 +107,7 @@ def select(data, state, t_range, thresholds, num_only=False, return_index=False)
 
     def step_select(step_data, step_avg):
         mask = np.logical_and(step_avg > thresholds[state], step_avg < thresholds[state + 1])
-        index = np.where(mask)
+        index = np.where(mask)[0]
         if return_index:
             return index
         if num_only:
