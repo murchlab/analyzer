@@ -30,6 +30,7 @@ def measurehist(data, t_range, fit=True, n_components=3, log_scale=True, show_pl
         gmm_tied = mixture.GaussianMixture(n_components, means_init=mean_init.reshape(-1, 1),
                                            covariance_type='tied', tol=1E-10, n_init=5)
         gmm_tied.fit(avg[:sample_num].reshape(-1, 1))
+        print("Rough means:")
         print(gmm_tied.means_)
         gmm = mixture.GaussianMixture(n_components, weights_init=gmm_tied.weights_, means_init=gmm_tied.means_,
                                       max_iter=1000, tol=1E-100, warm_start=False)
@@ -54,6 +55,8 @@ def measurehist(data, t_range, fit=True, n_components=3, log_scale=True, show_pl
         weights, means, covariances = fit_params.transpose()
         # print(fit_params)
         thresholds = gaussian2thresholds(means, covariances)
+        print("Means:")
+        print(means)
         print("Thresholds:")
         print(thresholds)
         trans = transforms.blended_transform_factory(ax.transData, ax.transAxes)
