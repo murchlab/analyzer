@@ -225,7 +225,7 @@ def bloch_vector(rho):
         INPUT:  2x2 density matrix rho
         OUTPUT:  The bloch vector components
     """
-    vector = [np.trace(rho @ E) for E in sigma4[1:]]
+    vector = [np.real(np.trace(rho @ E)) for E in sigma4[1:]]
     return np.asarray(vector)
 
 
