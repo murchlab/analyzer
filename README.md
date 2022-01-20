@@ -7,5 +7,5 @@ Python tools for
 * Data acquisition
 * Experiment automation
 * Result analysis
-* (computational modeling)
+* (Computational modeling)
 
